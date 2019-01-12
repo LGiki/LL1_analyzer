@@ -2,12 +2,14 @@
 
 using namespace std;
 
-map<char, vector<string>> GRAMMAR;
-map<char, set<char>> FIRST;
-map<char, set<char>> FOLLOW;
-set<char> nonTerminalSymbol;
-set<char> terminalSymbol;
-map<char, bool> toEpsilon;
+map<char, vector<string>> GRAMMAR;  // 文法
+map<char, set<char>> FIRST;     // 非终结符的first集合
+map<char, set<char>> FOLLOW;    // 非终结符的follow集合
+set<char> nonTerminalSymbol;    // 非终结符集合
+set<char> terminalSymbol;       //终结符集合
+map<char, bool> toEpsilon;      //First集合是否存在空串
+bool left_recursive = false; // 文法是否存在左递归
+bool judge_LL1_third = false; // 判断是否为LL1文法的第三步
 
 void getFIRST() {
     bool update = true;
@@ -99,6 +101,86 @@ void getFOLLOW() {
     }
 }
 
+void is_left_recursive(char s, string ss) { // 判断非终结符S是否有左递归
+    if (left_recursive)
+        return;
+    if (ss[0] == s) {
+        left_recursive = true;
+    }
+    else if (isupper(ss[0])) {
+        for(string str : GRAMMAR[ss[0]]) {
+            is_left_recursive(s, str);
+        }
+    }
+}
+
+set<char> getRightFirst(string ss) { // 得到产生式右部的first集合
+    set<char> s;
+    for (char c : ss) {
+        judge_LL1_third = false;
+        if (!isupper(c)) {
+            s.insert(c);
+            break;
+        }
+        else {
+            set<char> s = FIRST[c];
+            for (auto j : s) {
+                if (j == '@') {
+                    judge_LL1_third = true;
+                }
+                else {
+                    s.insert(j);
+                }
+            }
+            if (!judge_LL1_third) {
+                break;
+            }
+        }
+    }
+    return s;
+}
+
+bool has_union(set<char> s, set<char> ss) { // 判断两个集合是否有交集
+    for (auto i : s) {
+        for (auto j : ss) {
+            if (i == j) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool is_LL1() {		//判断文法是不是LL1文法
+    for (auto i : nonTerminalSymbol) {
+        judge_LL1_third = false;
+        vector<string> v = GRAMMAR[i]; // 存储产生式
+
+        // 1. 判断是否有左递归
+        for(string str : v) {
+            is_left_recursive(i, str);
+            if (left_recursive) {
+                return false;
+            }
+        }
+        // 2. 判断first是否有交集
+        for (int i = 0; i < v.size(); i++) {
+            for (int j = i + 1; j < v.size(); j++) {
+                if (has_union(getRightFirst(v[i]), getRightFirst(v[j]))) {
+                    return false;
+                }
+            }
+        }
+        // 3. 判断第三步
+        if (judge_LL1_third) {
+            for (auto s : v) {
+                if (has_union(getRightFirst(s), FOLLOW[i]));
+            }
+        }
+    }
+    return true;
+}
+
 int main(int argc, char **argv) {
 //    if(argc <= 1) {
 ////        cout << "Please input file.";
@@ -160,6 +242,12 @@ int main(int argc, char **argv) {
     for (char terminalChar : terminalSymbol) {
         cout << terminalChar << " ";
     }
-
+    cout << endl;
+    if (!is_LL1()) {
+        printf("No LL(1)\n");
+    }
+    else {
+        printf("Is LL(1)\n");
+    }
     return 0;
 }
