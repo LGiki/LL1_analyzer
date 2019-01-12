@@ -3,43 +3,11 @@
 using namespace std;
 
 map<char, vector<string>> GRAMMAR;
-multimap<string, char> reversedGrammar;
 map<char, set<char>> FIRST;
 map<char, set<char>> FOLLOW;
 set<char> nonTerminalSymbol;
 set<char> terminalSymbol;
 map<char, bool> toEpsilon;
-
-//void first(char ch, set<char> &collection) {
-//    auto iter = GRAMMAR.find(ch);
-//    if (iter == GRAMMAR.end()) {     //未找到以 ch 开头的产生式，则直接退出
-//        return;
-//    }
-//    for (int i = 0; i < GRAMMAR.count(ch); i++, iter++) {
-//        for (char chr : iter->second) {
-//            if (!isupper(chr)) {     //终结符
-//                collection.insert(chr);
-//                break;
-//            } else {
-//                if (chr == ch) {     //存在左递归，跳出循环
-//                    break;
-//                }
-//                first(chr, collection);     //递归查找
-//                if (!toEpsilon[chr]) {       //直到找到第一个First集合里面不包含Epsilon的非终结符
-//                    break;
-//                }
-//            }
-//        }
-//    }
-//}
-//
-//void getFIRST() {
-//    for (char nonTerminalChar : nonTerminalSymbol) {
-//        set<char> collection;
-//        first(nonTerminalChar, collection);
-//        FIRST.insert(make_pair(nonTerminalChar, collection));
-//    }
-//}
 
 void getFIRST() {
     bool update = true;
@@ -48,19 +16,19 @@ void getFIRST() {
         for (char nonTerminalChar : nonTerminalSymbol) { //遍历非终结符
             int firstSize = FIRST[nonTerminalChar].size();
             for (string rightSide : GRAMMAR[nonTerminalChar]) {  //遍历产生式右部
-                for (char ch : rightSide) {
-                    if (!isupper(ch)) {
-                        FIRST[nonTerminalChar].insert(ch);
-                        break;
+                for (char ch : rightSide) {     //遍历产生式右部所有字符
+                    if (!isupper(ch)) {     //如果是非终结符
+                        FIRST[nonTerminalChar].insert(ch);  //将该非终结符加入到 nonTerminalChar 的 First 集合中
+                        break;      //退出循环
                     } else {
-                        bool flag = false;
-                        for (char temp : FIRST[ch]) {
+                        bool flag = false;      //判断 First 集合是否存在空串
+                        for (char temp : FIRST[ch]) {   //将 ch 的 First 集合加入到 nonTerminalChar 的 First 集合中
                             if (temp == '@') {
                                 flag = true;
                             }
                             FIRST[nonTerminalChar].insert(temp);
                         }
-                        if (!flag) {
+                        if (!flag) {        //如果不存在空串，退出循环
                             break;
                         }
                     }
@@ -73,142 +41,62 @@ void getFIRST() {
     }
 }
 
-bool isLast(string str, char ch) {  //ch 是否是 s 的直接或间接的最后一个非终结符
-    if (!isupper(ch)) {
-        return false;
-    }
-    for (int i = str.length() - 1; i >= 0; i--) {
-        if (ch == str[i]) {
-            return true;
-        }
-        if (!isupper(str[i]) || toEpsilon[str[i]] == false) {
-            return false;
-        }
-    }
-    return false;
-}
-
-//void follow(char ch, set<char> &collection) {
-//    if (!isupper(ch)) {
-//        //如果不是非终结符就退出
-//        return;
-//    }
-//    for (auto iter = GRAMMAR.begin(); iter != GRAMMAR.end(); iter++) {
-//        for (string rightSide : iter->second) {
-//            for (int i = 0; i < rightSide.length(); i++) {
-//                if (ch == rightSide[i]) {
-//                    if (i != rightSide.length() - 1) {
-//                        if (!isupper(rightSide[i + 1])) {
-//                            //在所有产生式中直接出现在该非终结符后面的终结符直接加入到该非终结符的 Follow 集合
-//                            collection.insert(rightSide[i + 1]);
-//                        } else {
-//                            //需要将该非终结符后的非终结符的 First 集合加入到该终结符的 Follow 集合中
-////                            first(rightSide[i + 1], collection);
-//                            for (char temp : FIRST[rightSide[i + 1]]) {
-//                                collection.insert(temp);
-//                            }
-//                        }
-//                    }
-//                    if (i == rightSide.length() - 1) {
-//                        collection.insert('$');
-//                    } else if (i < rightSide.length() - 1) {
-//                        bool flag = true;
-//                        for (int j = i + 1; j < rightSide.length(); j++) {
-//                            if (!isupper(rightSide[j]) || !toEpsilon[rightSide[j]]) {
-//                                flag = false;
-//                                if (!isupper(rightSide[j])) {
-//                                    collection.insert(rightSide[j]);
-//                                }
-//                                break;
-//                            }
-//                        }
-//                        if (flag) {
-//                            collection.insert('$');
-//                        }
-//                    }
-//                }
-//                if (isLast(rightSide, ch)) {
-//                    auto iter2 = reversedGrammar.find(rightSide);
-//                    for (int i = 0; i < reversedGrammar.count(rightSide); i++, iter2++) {
-//                        if (iter2->second != ch) {
-//                            follow(iter2->second, collection);
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//    }
-//}
-
 void getFOLLOW() {
     bool update = true;
     while (update) {
         update = false;
         for (char nonTerminalChar : nonTerminalSymbol) { //遍历非终结符
-            int followSize = FOLLOW[nonTerminalChar].size();
-            for (auto iter = GRAMMAR.begin(); iter != GRAMMAR.end(); iter++) {
+            int followSize = FOLLOW[nonTerminalChar].size();    //记录 Follow 集合初始大小
+            for (auto iter = GRAMMAR.begin(); iter != GRAMMAR.end(); iter++) {      //遍历所有文法
                 for (string rightSide : iter->second) {      //遍历所有产生式右部
-//                    cout << rightSide << endl;
                     int i = 0;
-                    while (i < rightSide.length()) {
+                    while (i < rightSide.length()) {    //遍历产生式右部字符
                         for (; i < rightSide.length(); i++) {
-                            if (nonTerminalChar == rightSide[i]) {
-                                if(i == rightSide.length() - 1 && isupper(rightSide[i])) {
-                                    for(char ch : FOLLOW[iter->first]) {
+                            if (nonTerminalChar == rightSide[i]) {  //找到与 nonTerminalChar 相同的字符
+                                if (i == rightSide.length() - 1) { //判断找到的非终结符是否是右部最后一个字符
+                                    for (char ch : FOLLOW[iter->first]) {   //把产生式左部非终结符的 Follow 加入到 nonTerminalChar 的 Follow 集合中
                                         FOLLOW[nonTerminalChar].insert(ch);
                                     }
                                 }
                                 i++;
-                                break;
+                                break;  //找到了就停止
                             }
                         }
-                        for (; i < rightSide.length(); i++) {
-                            if (!isupper(rightSide[i])) {
-                                FOLLOW[nonTerminalChar].insert(rightSide[i]);
-                                break;
-                            } else {
-                                for (char ch : FIRST[rightSide[i]]) {
+                        for (; i < rightSide.length(); i++) {   //遍历后续字符
+                            if (!isupper(rightSide[i])) {   //如果是非终结符
+                                FOLLOW[nonTerminalChar].insert(
+                                        rightSide[i]);   //直接将非终结符加入到 nonTerminalChar 的 Follow 集合中
+                                break;      //直接退出
+                            } else {        //是终结符
+                                for (char ch : FIRST[rightSide[i]]) {   //将该终结符的 First 集合加入到 nonTerminalChar 的 Follow 集合中（除了空串）
                                     if (ch != '@') {
                                         FOLLOW[nonTerminalChar].insert(ch);
                                     }
                                 }
-                                if (!toEpsilon[rightSide[i]]) {
+                                if (!toEpsilon[rightSide[i]]) {     //如果该终结符的 First 集合中不存在空串，则退出循环
                                     break;
-                                } else {
-                                    for(char ch : FOLLOW[iter->first]) {
-                                        FOLLOW[nonTerminalChar].insert(ch);
+                                } else if (i == rightSide.length() - 1) {        //该终结符的 First 集合中存在空串，且为右部最后一个字符
+                                    for (char ch : FOLLOW[iter->first]) {
+                                        FOLLOW[nonTerminalChar].insert(
+                                                ch);     //将左部非终结符的 Follow 加入到 nonTerminalChar 的 Follow 集合中
                                     }
                                 }
                             }
-                            if(i == rightSide.length() - 1 && isupper(rightSide[i])) {
-                                for(char ch : FOLLOW[iter->first]) {
-                                    FOLLOW[nonTerminalChar].insert(ch);
+                            if (i == rightSide.length() - 1 && rightSide[i] == nonTerminalChar) { //如果最后一个字符是 nonTerminalChar
+                                for (char ch : FOLLOW[iter->first]) {
+                                    FOLLOW[nonTerminalChar].insert(
+                                            ch); //把产生式左部非终结符的 Follow 加入到 nonTerminalChar 的 Follow 集合中
                                 }
                             }
                         }
                     }
-
                 }
             }
             if (followSize != FOLLOW[nonTerminalChar].size()) {
                 update = true;
             }
         }
-
     }
-//    for (char nonTerminalChar : nonTerminalSymbol) {
-//        set<char> collection;
-//        follow(nonTerminalChar, collection);
-//        FOLLOW.insert(make_pair(nonTerminalChar, collection));
-//        for (char temp : collection) {
-//            if (temp != '@') {
-//                FOLLOW[nonTerminalChar].insert(temp);
-//            }
-//        }
-//        if (nonTerminalChar == GRAMMAR.begin()->first) {
-//            FOLLOW[nonTerminalChar].insert('$');
-//        }
-//    }
 }
 
 int main(int argc, char **argv) {
@@ -234,7 +122,6 @@ int main(int argc, char **argv) {
             FOLLOW[temp[0]].insert('$');
             isFirstNonTerminalChar = false;
         }
-        reversedGrammar.insert(make_pair(temp.substr(3), temp[0]));     //读入文法并反转添加到 reversedGrammar 中
         nonTerminalSymbol.insert(temp[0]);      //初始化非终结符集合
         for (int i = 3; i < temp.length(); i++) {
             if (!isupper(temp[i]) && temp[i] != '@') {
