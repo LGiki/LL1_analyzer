@@ -4,21 +4,21 @@
 using namespace std;
 using bprinter::TablePrinter;
 
-map<char, vector<string>> GRAMMAR;  //文法
-map<char, set<char>> FIRST;     //非终结符的first集合
-map<char, set<char>> FOLLOW;    //非终结符的follow集合
-set<char> nonTerminalSymbol;    //非终结符集合
-set<char> terminalSymbol;       //终结符集合
-map<char, bool> toEpsilon;      //First集合是否存在空串
+map<char, vector<string>> GRAMMAR;          //文法
+map<char, set<char>> FIRST;                 //非终结符的first集合
+map<char, set<char>> FOLLOW;                //非终结符的follow集合
+set<char> nonTerminalSymbol;                //非终结符集合
+set<char> terminalSymbol;                   //终结符集合
+map<char, bool> toEpsilon;                  //First集合是否存在空串
 map<string, vector<string>> analysisTable;  //分析表
-bool left_recursive = false; // 文法是否存在左递归
-bool judge_LL1_third = false; // 判断是否为LL1文法的第三步
-char startNonTerminalChar;      //文法的起始符号
-string expressionStr;       //表达式
-string judge_message; // 判断非LL1文法的错误信息
-bool analysisResult = true;
+bool left_recursive = false;                //文法是否存在左递归
+bool judge_LL1_third = false;               //判断是否为LL1文法的第三步
+char startNonTerminalChar;                  //文法的起始符号
+string expressionStr;                       //表达式
+string judge_message;                       //判断非LL1文法的错误信息
+bool analysisResult = true;                 //分析结果
 
-void getFIRST() {
+void getFIRST() {   //计算 FIRST 集合
     bool update = true;
     while (update) {
         update = false;
@@ -48,9 +48,12 @@ void getFIRST() {
             }
         }
     }
+    for (char nonTerminalChar: nonTerminalSymbol) {
+        toEpsilon[nonTerminalChar] = FIRST[nonTerminalChar].find('@') != FIRST[nonTerminalChar].end();
+    }
 }
 
-void getFOLLOW() {
+void getFOLLOW() {  //计算 FOLLOW 集合
     bool update = true;
     while (update) {
         update = false;
@@ -109,6 +112,34 @@ void getFOLLOW() {
     }
 }
 
+void printFIRST() {     //打印 FIRST 集合
+    cout << "First: " << endl;
+    for (char chr : nonTerminalSymbol) {
+        cout << chr << ": ";
+        set<char> first;
+        first = FIRST[chr];
+        for (char ch : first) {
+            cout << ch << " ";
+        }
+        cout << endl;
+    }
+    cout << endl;
+}
+
+void printFOLLOW() {    //打印 FOLLOW 集合
+    cout << "Follow: " << endl;
+    for (char chr : nonTerminalSymbol) {
+        cout << chr << ": ";
+        set<char> follow;
+        follow = FOLLOW[chr];
+        for (char ch : follow) {
+            cout << ch << " ";
+        }
+        cout << endl;
+    }
+    cout << endl;
+}
+
 void is_left_recursive(char s, string ss) { // 判断非终结符S是否有左递归
     if (left_recursive)
         return;
@@ -146,7 +177,7 @@ set<char> getRightFirst(string ss) { // 得到产生式右部的first集合
             }
         }
     }
-    if(flag) {
+    if (flag) {
         judge_LL1_third = true;
     }
     return s;
@@ -281,7 +312,7 @@ void createAnalysisTable() {
             }
         }
     }
-    for (char nonTerminalChar : nonTerminalSymbol) {
+    for (char nonTerminalChar : nonTerminalSymbol) {        //插入同步记号，通过 nonTerminalChar 的 FOLLOW 集合
         for (char follow : FOLLOW[nonTerminalChar]) {
             string temp;
             temp.push_back(nonTerminalChar);
@@ -290,35 +321,6 @@ void createAnalysisTable() {
                 analysisTable[temp].push_back("synch");
             }
         }
-    }
-}
-
-void printAnalysisTable() {
-    set<char> terminalSymbolWithDollor = terminalSymbol;
-    terminalSymbolWithDollor.insert('$');
-    cout << "\t";
-    for (char terminalChar : terminalSymbolWithDollor) {
-        cout << terminalChar << "\t";
-    }
-    cout << endl;
-    for (char nonTerminalChar :nonTerminalSymbol) {
-        cout << nonTerminalChar << "\t";
-        for (char terminalChar : terminalSymbolWithDollor) {
-            string temp = "";
-            temp += nonTerminalChar;
-            temp += terminalChar;
-            auto iter = analysisTable.find(temp);
-            if (iter != analysisTable.end()) {
-                cout << nonTerminalChar << "->";
-                auto iter2 = iter->second.begin();
-                iter2++;
-                for (; iter2 != iter->second.end(); iter2++) {
-                    cout << *iter2;
-                }
-            }
-            cout << "\t";
-        }
-        cout << endl;
     }
 }
 
@@ -364,11 +366,12 @@ void printAnalysisTableUsingBPrinter() {
 
 void analysis() {
     vector<string> analysisStack;
+    //栈初始化
     analysisStack.push_back("$");
     string temp;
     temp.push_back(startNonTerminalChar);
     analysisStack.push_back(temp);
-    int index = 0;
+    int index = 0;  //初始化索引
     cout << "=========================================" << endl;
     cout << "Stack\t\tInput\t\tAction" << endl;
     cout << "-----------------------------------------" << endl;
@@ -391,36 +394,37 @@ void analysis() {
         temp.clear();
         temp = analysisStack.back() + a;
         auto iter = analysisTable.find(temp);
-        if (analysisStack.back() == a) {
+        if (analysisStack.back() == a) {    // X 是 a ，把 X 从栈顶弹出并吧 index 推进到指向下一个符号
             printAction += ("Match " + a);
             analysisStack.pop_back();   //出栈
             index++;        //输入串索引加一
-        } else if (!isupper(analysisStack.back()[0])) {
+        } else if (!isupper(analysisStack.back()[0])) {     //X是终结符
             printAction =
                     "Error at index " + to_string(index) + ", Stack top != " + a + ", pop " + analysisStack.back();
             analysisResult = false;
             analysisStack.pop_back();
-        } else if (iter == analysisTable.end()) {
+        } else if (iter == analysisTable.end()) {   //M[X, a]是出错入口
             index++;
             printAction = "Error at index " + to_string(index) + ", jump " + a;
             analysisResult = false;
-        } else if (iter != analysisTable.end()) {
+        } else if (iter != analysisTable.end()) {   //M[X, a]不是出错入口
             vector<string> tempVector = iter->second;
-            if (tempVector.size() == 1 && tempVector[0] == "synch") {
+            if (tempVector.size() == 1 && tempVector[0] == "synch") {   //处理同步记号的情况
                 printAction = "Error at index " + to_string(index) + ", " + a + " is in " + analysisStack.back() +
                               " synch, pop " + analysisStack.back();
                 analysisResult = false;
                 analysisStack.pop_back();
             } else {
+                //输出产生式
                 printAction += "output: ";
                 printAction += (tempVector[0] + " -> ");
                 for (int i = 1; i < tempVector.size(); i++) {
                     printAction += tempVector[i];
                 }
-                analysisStack.pop_back();
+                analysisStack.pop_back();       //从栈中弹出X
                 for (int i = tempVector.size() - 1; i >= 1; i--) {
                     if (tempVector[i] != "@") {
-                        analysisStack.push_back(tempVector[i]);
+                        analysisStack.push_back(tempVector[i]);     //逆序压栈
                     }
                 }
             }
@@ -431,15 +435,7 @@ void analysis() {
     cout << "-----------------------------------------" << endl;
 }
 
-int main(int argc, char **argv) {
-//    if(argc <= 1) {
-//        cout << "Please input file.";
-//        exit(EXIT_FAILURE);
-//    }
-//    if(!freopen(argv[1], "r", stdin)) {
-//        cout << "Fail to open file.";
-//        exit(EXIT_FAILURE);
-//    }
+void init() {   //程序初始化：读入文法、初始化全局变量、输出非终结符跟终结符、读入要分析的表达式
     ifstream stream;
     stream.open("../grammar.txt");
     if (!stream.is_open()) {
@@ -468,51 +464,17 @@ int main(int argc, char **argv) {
         }
         cout << temp << endl;
     }
+    cout << endl;
     cout << "Nonterminal Symbol: " << endl;
     for (char nonTerminalChar:nonTerminalSymbol) {
         cout << nonTerminalChar << " ";
     }
-    cout << endl;
+    cout << endl << endl;
     cout << "Terminal Symbol: " << endl;
     for (char terminalChar : terminalSymbol) {
         cout << terminalChar << " ";
     }
-    cout << endl;
-
-    getFIRST();     //计算 First 集合
-    for (char nonTerminalChar: nonTerminalSymbol) {
-        toEpsilon[nonTerminalChar] = FIRST[nonTerminalChar].find('@') != FIRST[nonTerminalChar].end();
-    }
-    getFOLLOW();    //计算 Follow 集合
-
-    cout << "First: " << endl;
-    for (char chr : nonTerminalSymbol) {
-        cout << chr << ": ";
-        set<char> first;
-        first = FIRST[chr];
-        for (char ch : first) {
-            cout << ch << " ";
-        }
-        cout << endl;
-    }
-    cout << "Follow: " << endl;
-    for (char chr : nonTerminalSymbol) {
-        cout << chr << ": ";
-        set<char> follow;
-        follow = FOLLOW[chr];
-        for (char ch : follow) {
-            cout << ch << " ";
-        }
-        cout << endl;
-    }
-    if (!is_LL1()) {
-        cout << judge_message << endl;
-        exit(EXIT_FAILURE);
-    } else {
-        cout << judge_message << endl;
-    }
-    createAnalysisTable();
-    printAnalysisTableUsingBPrinter();
+    cout << endl << endl;
     stream.close();
     stream.open("../expression.txt");
     if (!stream.is_open()) {
@@ -521,14 +483,29 @@ int main(int argc, char **argv) {
     }
     stream >> expressionStr;
     stream.close();
-    cout << "Expression: " << expressionStr << endl;
+}
+
+int main(int argc, char **argv) {
+    init();
+    getFIRST();     //计算 First 集合
+    getFOLLOW();    //计算 Follow 集合
+    printFIRST();
+    printFOLLOW();
+    if (!is_LL1()) {
+        cout << judge_message << endl << endl;
+        exit(EXIT_FAILURE);
+    } else {
+        cout << judge_message << endl << endl;
+    }
+    createAnalysisTable();
+    cout << "Analysis Table:" << endl;
+    printAnalysisTableUsingBPrinter();
+    cout << endl << "Expression: " << expressionStr << endl << endl;
     analysis();
     if (analysisResult) {
         cout << expressionStr << " is correct." << endl;
     } else {
         cout << expressionStr << " is incorrect." << endl;
     }
-
-
     return 0;
 }

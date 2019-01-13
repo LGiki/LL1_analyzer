@@ -1,6 +1,10 @@
-S->A
-S->B
-A->a
-A->@
-B->b
-B->@
+E->TG
+G->+TG
+G->-TG
+G->@
+T->FS
+S->*FS
+S->/FS
+S->@
+F->(E)
+F->i
