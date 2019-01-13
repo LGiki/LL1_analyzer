@@ -4,6 +4,8 @@
 using namespace std;
 using bprinter::TablePrinter;
 
+std::string& trim(std::string &);
+
 map<char, vector<string>> GRAMMAR;  //文法
 map<char, set<char>> FIRST;     //非终结符的first集合
 map<char, set<char>> FOLLOW;    //非终结符的follow集合
@@ -15,6 +17,18 @@ bool left_recursive = false; // 文法是否存在左递归
 bool judge_LL1_third = false; // 判断是否为LL1文法的第三步
 char startNonTerminalChar;      //文法的起始符号
 string expressionStr;       //表达式
+
+std::string& trim(std::string &s)
+{
+    if (s.empty())
+    {
+        return s;
+    }
+
+    s.erase(0,s.find_first_not_of(" "));
+    s.erase(s.find_last_not_of(" ") + 1);
+    return s;
+}
 
 void getFIRST() {
     bool update = true;
@@ -376,15 +390,17 @@ int main(int argc, char **argv) {
     string temp;
     bool isFirstNonTerminalChar = true;
     while (getline(stream, temp)) {
-        GRAMMAR[temp[0]].push_back(temp.substr(3));
+        int arrorIndex = temp.find("->") + 2;
+        string rightSide = temp.substr(arrorIndex);
+        GRAMMAR[temp[0]].push_back(trim(rightSide));
         if (isFirstNonTerminalChar) {
             FOLLOW[temp[0]].insert('$');
             startNonTerminalChar = temp[0];
             isFirstNonTerminalChar = false;
         }
         nonTerminalSymbol.insert(temp[0]);      //初始化非终结符集合
-        for (int i = 3; i < temp.length(); i++) {
-            if (!isupper(temp[i]) && temp[i] != '@') {
+        for (int i = arrorIndex; i < temp.length(); i++) {
+            if (!isupper(temp[i]) && temp[i] != '@' && temp[i] != ' ') {
                 terminalSymbol.insert(temp[i]);     //初始化终结符集合
             }
         }
