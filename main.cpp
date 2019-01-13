@@ -365,6 +365,11 @@ void printAnalysisTableUsingBPrinter() {
 }
 
 void analysis() {
+    TablePrinter tp(&std::cout);
+    tp.AddColumn("Stack", 10);
+    tp.AddColumn("Input", 20);
+    tp.AddColumn("Action", 35);
+    tp.PrintHeader();
     vector<string> analysisStack;
     //栈初始化
     analysisStack.push_back("$");
@@ -372,9 +377,6 @@ void analysis() {
     temp.push_back(startNonTerminalChar);
     analysisStack.push_back(temp);
     int index = 0;  //初始化索引
-    cout << "=========================================" << endl;
-    cout << "Stack\t\tInput\t\tAction" << endl;
-    cout << "-----------------------------------------" << endl;
     string printStack = "";
     string printInput = "";
     string printAction = "";
@@ -385,7 +387,7 @@ void analysis() {
         for (int i = index; i < expressionStr.size(); i++) {
             printInput += expressionStr[i];
         }
-        cout << printStack << "\t\t" << printInput << "\t\t";   //输出栈、输入串
+        tp << printStack << printInput;
         printStack = "";
         printInput = "";
         printAction = "";
@@ -429,18 +431,23 @@ void analysis() {
                 }
             }
         }
-        cout << printAction << endl;
+        tp << printAction;
     }
-    for(int i = index; i  < expressionStr.length() - 1; i++) {  //当出现栈空，但输入串不为空的情况，需要跳过输入串中的字符，直到输入串空
-        cout << "$\t\t";
-        for(int j = i; j < expressionStr.length(); j++) {
-            cout << expressionStr[j];
+    for (int i = index; i < expressionStr.length() - 1; i++) {  //当出现栈空，但输入串不为空的情况，需要跳过输入串中的字符，直到输入串空
+        tp << "$";
+        string temp;
+        for (int j = i; j < expressionStr.length(); j++) {
+            temp.push_back(expressionStr[j]);
         }
-        cout << "\t\tError at index " + to_string(i) + ", jump " << expressionStr[i] << endl;
+        tp << temp;
+        temp.clear();
+        temp.append("Error at index " + to_string(i) + ", jump ");
+        temp.push_back(expressionStr[i]);
+        tp << temp;
         analysisResult = false;
     }
-    cout << "$\t\t$" << endl;
-    cout << "-----------------------------------------" << endl;
+    tp << "$" << "$" << bprinter::endl();
+    tp.PrintFooter();
 }
 
 void init() {   //程序初始化：读入文法、初始化全局变量、输出非终结符跟终结符、读入要分析的表达式
@@ -509,6 +516,7 @@ int main(int argc, char **argv) {
     cout << "Analysis Table:" << endl;
     printAnalysisTableUsingBPrinter();
     cout << endl << "Expression: " << expressionStr << endl << endl;
+    cout << "Analysis:" << endl;
     analysis();
     if (analysisResult) {
         cout << expressionStr << " is correct." << endl;
