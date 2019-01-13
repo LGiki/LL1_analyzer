@@ -431,6 +431,14 @@ void analysis() {
         }
         cout << printAction << endl;
     }
+    for(int i = index; i  < expressionStr.length() - 1; i++) {  //当出现栈空，但输入串不为空的情况，需要跳过输入串中的字符，直到输入串空
+        cout << "$\t\t";
+        for(int j = i; j < expressionStr.length(); j++) {
+            cout << expressionStr[j];
+        }
+        cout << "\t\tError at index " + to_string(i) + ", jump " << expressionStr[i] << endl;
+        analysisResult = false;
+    }
     cout << "$\t\t$" << endl;
     cout << "-----------------------------------------" << endl;
 }
