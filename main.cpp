@@ -4,8 +4,6 @@
 using namespace std;
 using bprinter::TablePrinter;
 
-std::string& trim(std::string &);
-
 map<char, vector<string>> GRAMMAR;  //文法
 map<char, set<char>> FIRST;     //非终结符的first集合
 map<char, set<char>> FOLLOW;    //非终结符的follow集合
@@ -17,18 +15,8 @@ bool left_recursive = false; // 文法是否存在左递归
 bool judge_LL1_third = false; // 判断是否为LL1文法的第三步
 char startNonTerminalChar;      //文法的起始符号
 string expressionStr;       //表达式
-
-std::string& trim(std::string &s)
-{
-    if (s.empty())
-    {
-        return s;
-    }
-
-    s.erase(0,s.find_first_not_of(" "));
-    s.erase(s.find_last_not_of(" ") + 1);
-    return s;
-}
+string judge_message; // 判断非LL1文法的错误信息
+bool analysisResult = true;
 
 void getFIRST() {
     bool update = true;
@@ -135,8 +123,12 @@ void is_left_recursive(char s, string ss) { // 判断非终结符S是否有左�
 
 set<char> getRightFirst(string ss) { // 得到产生式右部的first集合
     set<char> s;
+    bool flag = false;
+    if (ss == "@") {
+        judge_LL1_third = true;
+    }
     for (char c : ss) {
-        judge_LL1_third = false;
+        flag = false;
         if (!isupper(c)) {
             s.insert(c);
             break;
@@ -144,15 +136,18 @@ set<char> getRightFirst(string ss) { // 得到产生式右部的first集合
             set<char> first = FIRST[c];
             for (auto j : first) {
                 if (j == '@') {
-                    judge_LL1_third = true;
+                    flag = true;
                 } else {
                     s.insert(j);
                 }
             }
-            if (!judge_LL1_third) {
+            if (!flag) {
                 break;
             }
         }
+    }
+    if(flag) {
+        judge_LL1_third = true;
     }
     return s;
 }
@@ -169,14 +164,14 @@ bool has_union(set<char> s, set<char> ss) { // 判断两个集合是否有交集
 }
 
 bool is_LL1() {        //判断文法是不是LL1文法
-    for (auto i : nonTerminalSymbol) {
+    for (auto nonTerminalChar : nonTerminalSymbol) {
         judge_LL1_third = false;
-        vector<string> v = GRAMMAR[i]; // 存储产生式
-
+        vector<string> v = GRAMMAR[nonTerminalChar]; // 存储产生式
         // 1. 判断是否有左递归
         for (string str : v) {
-            is_left_recursive(i, str);
+            is_left_recursive(nonTerminalChar, str);
             if (left_recursive) {
+                judge_message = "This grammar is not LL(1) grammar, because it has left recursive.";
                 return false;
             }
         }
@@ -184,17 +179,60 @@ bool is_LL1() {        //判断文法是不是LL1文法
         for (int i = 0; i < v.size(); i++) {
             for (int j = i + 1; j < v.size(); j++) {
                 if (has_union(getRightFirst(v[i]), getRightFirst(v[j]))) {
+                    string grammarOne;
+                    grammarOne.push_back(nonTerminalChar);
+                    grammarOne.append("->");
+                    grammarOne.append(v[i]);
+                    string grammarTwo;
+                    grammarTwo.push_back(nonTerminalChar);
+                    grammarTwo.append("->");
+                    grammarTwo.append(v[j]);
+                    judge_message = "This grammar is not LL(1) grammar, because " + grammarOne +
+                                    " 's FIRST collection has union part with " + grammarTwo + " 's FIRST collection.";
                     return false;
                 }
             }
         }
         // 3. 判断第三步
         if (judge_LL1_third) {
-            for (auto s : v) {
-                if (has_union(getRightFirst(s), FOLLOW[i]));
+            int cnt = 0;
+            bool flag = false;
+            string s;
+            for (auto str : v) {
+                flag = false;
+                for (auto ch : str) {
+                    if (!isupper(ch) || !toEpsilon[ch]) {
+                        flag = true;
+                        break;
+                    }
+                }
+                if (!flag) {
+                    s = str;
+                    cnt++;
+                }
+            }
+            if (cnt >= 2) {
+                judge_message = "This grammar is not LL(1) grammar";
+                return false;
+            }
+            for (auto str : v) {
+                if (str == s) {
+                    continue;
+                }
+                if (has_union(getRightFirst(str), FOLLOW[nonTerminalChar])) {
+                    string grammar;
+                    grammar.push_back(nonTerminalChar);
+                    grammar.append("->");
+                    grammar.append(str);
+                    judge_message = "This grammar is not LL(1) grammar, because " + grammar +
+                                    " 's FIRST collection has union part with " + nonTerminalChar +
+                                    "'s FOLLOW collection.";
+                    return false;
+                }
             }
         }
     }
+    judge_message = "This grammar is LL(1) grammar.";
     return true;
 }
 
@@ -240,6 +278,16 @@ void createAnalysisTable() {
                     cout << "Create Analysis Table Error!" << endl;
                     exit(EXIT_FAILURE);
                 }
+            }
+        }
+    }
+    for (char nonTerminalChar : nonTerminalSymbol) {
+        for (char follow : FOLLOW[nonTerminalChar]) {
+            string temp;
+            temp.push_back(nonTerminalChar);
+            temp.push_back(follow);
+            if (analysisTable.find(temp) == analysisTable.end()) {
+                analysisTable[temp].push_back("synch");
             }
         }
     }
@@ -294,12 +342,16 @@ void printAnalysisTableUsingBPrinter() {
             auto iter = analysisTable.find(temp);
             if (iter != analysisTable.end()) {
                 string expressionStr = "";
-                expressionStr += nonTerminalChar;
-                expressionStr += "->";
-                auto iter2 = iter->second.begin();
-                iter2++;
-                for (; iter2 != iter->second.end(); iter2++) {
-                    expressionStr += *iter2;
+                if (iter->second.size() == 1 && *iter->second.begin() == "synch") {
+                    expressionStr = "synch";
+                } else {
+                    expressionStr += nonTerminalChar;
+                    expressionStr += "->";
+                    auto iter2 = iter->second.begin();
+                    iter2++;
+                    for (; iter2 != iter->second.end(); iter2++) {
+                        expressionStr += *iter2;
+                    }
                 }
                 tp << expressionStr;
             } else {
@@ -344,24 +396,30 @@ void analysis() {
             analysisStack.pop_back();   //出栈
             index++;        //输入串索引加一
         } else if (!isupper(analysisStack.back()[0])) {
-            printAction = "Error at index " + to_string(index) + ", Stack top != " + a + ", pop " + analysisStack.back();
+            printAction =
+                    "Error at index " + to_string(index) + ", Stack top != " + a + ", pop " + analysisStack.back();
+            analysisResult = false;
             analysisStack.pop_back();
         } else if (iter == analysisTable.end()) {
             index++;
-            printAction = "Error at index " + to_string(index) +", jump " + a;
+            printAction = "Error at index " + to_string(index) + ", jump " + a;
+            analysisResult = false;
         } else if (iter != analysisTable.end()) {
             vector<string> tempVector = iter->second;
-            if(tempVector.size() != 1 && tempVector[0] == "synch") {
-                printAction = "Error at index " + to_string(index) + ", " + a + " is in " + analysisStack.back() + " synch, pop " + analysisStack.back();
+            if (tempVector.size() == 1 && tempVector[0] == "synch") {
+                printAction = "Error at index " + to_string(index) + ", " + a + " is in " + analysisStack.back() +
+                              " synch, pop " + analysisStack.back();
+                analysisResult = false;
                 analysisStack.pop_back();
-            }else{
+            } else {
+                printAction += "output: ";
                 printAction += (tempVector[0] + " -> ");
-                for(int i = 1; i < tempVector.size(); i++) {
+                for (int i = 1; i < tempVector.size(); i++) {
                     printAction += tempVector[i];
                 }
                 analysisStack.pop_back();
-                for(int i = tempVector.size() - 1; i >= 1; i--) {
-                    if(tempVector[i] != "@") {
+                for (int i = tempVector.size() - 1; i >= 1; i--) {
+                    if (tempVector[i] != "@") {
                         analysisStack.push_back(tempVector[i]);
                     }
                 }
@@ -370,6 +428,7 @@ void analysis() {
         cout << printAction << endl;
     }
     cout << "$\t\t$" << endl;
+    cout << "-----------------------------------------" << endl;
 }
 
 int main(int argc, char **argv) {
@@ -389,22 +448,37 @@ int main(int argc, char **argv) {
     }
     string temp;
     bool isFirstNonTerminalChar = true;
+    cout << "Grammar:" << endl;
     while (getline(stream, temp)) {
-        int arrorIndex = temp.find("->") + 2;
-        string rightSide = temp.substr(arrorIndex);
-        GRAMMAR[temp[0]].push_back(trim(rightSide));
+        int nPos = 0;
+        while ((nPos = temp.find(" ", nPos)) != temp.npos) {
+            temp.replace(nPos, 1, "");
+        }
+        GRAMMAR[temp[0]].push_back(temp.substr(3));
         if (isFirstNonTerminalChar) {
             FOLLOW[temp[0]].insert('$');
             startNonTerminalChar = temp[0];
             isFirstNonTerminalChar = false;
         }
         nonTerminalSymbol.insert(temp[0]);      //初始化非终结符集合
-        for (int i = arrorIndex; i < temp.length(); i++) {
-            if (!isupper(temp[i]) && temp[i] != '@' && temp[i] != ' ') {
+        for (int i = 3; i < temp.length(); i++) {
+            if (!isupper(temp[i]) && temp[i] != '@') {
                 terminalSymbol.insert(temp[i]);     //初始化终结符集合
             }
         }
+        cout << temp << endl;
     }
+    cout << "Nonterminal Symbol: " << endl;
+    for (char nonTerminalChar:nonTerminalSymbol) {
+        cout << nonTerminalChar << " ";
+    }
+    cout << endl;
+    cout << "Terminal Symbol: " << endl;
+    for (char terminalChar : terminalSymbol) {
+        cout << terminalChar << " ";
+    }
+    cout << endl;
+
     getFIRST();     //计算 First 集合
     for (char nonTerminalChar: nonTerminalSymbol) {
         toEpsilon[nonTerminalChar] = FIRST[nonTerminalChar].find('@') != FIRST[nonTerminalChar].end();
@@ -417,7 +491,7 @@ int main(int argc, char **argv) {
         set<char> first;
         first = FIRST[chr];
         for (char ch : first) {
-            cout << ch;
+            cout << ch << " ";
         }
         cout << endl;
     }
@@ -427,33 +501,18 @@ int main(int argc, char **argv) {
         set<char> follow;
         follow = FOLLOW[chr];
         for (char ch : follow) {
-            cout << ch;
+            cout << ch << " ";
         }
         cout << endl;
     }
-
-    cout << "terminalSymbol: " << endl;
-    for (char terminalChar : terminalSymbol) {
-        cout << terminalChar << " ";
-    }
-    cout << endl;
-
     if (!is_LL1()) {
-        cout << "Not LL(1)" << endl;
+        cout << judge_message << endl;
+        exit(EXIT_FAILURE);
     } else {
-        cout << "Is LL(1)" << endl;
+        cout << judge_message << endl;
     }
     createAnalysisTable();
-//    for (auto iter = analysisTable.begin(); iter != analysisTable.end(); iter++) {
-//        cout << iter->first << "\t";
-//        for (char ch : iter->second) {
-//            cout << ch;
-//        }
-//        cout << endl;
-//    }
-//    printAnalysisTable();
     printAnalysisTableUsingBPrinter();
-
     stream.close();
     stream.open("../expression.txt");
     if (!stream.is_open()) {
@@ -464,5 +523,12 @@ int main(int argc, char **argv) {
     stream.close();
     cout << "Expression: " << expressionStr << endl;
     analysis();
+    if (analysisResult) {
+        cout << expressionStr << " is correct." << endl;
+    } else {
+        cout << expressionStr << " is incorrect." << endl;
+    }
+
+
     return 0;
 }

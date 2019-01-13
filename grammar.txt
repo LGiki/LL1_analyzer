@@ -1,8 +1,6 @@
-E->TQ
-Q->+TQ
-Q->@
-T->FP
-P->*FP
-P->@
-F->(E)
-F->i
+S->A
+S->B
+A->a
+A->@
+B->b
+B->@
