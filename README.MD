@@ -2,10 +2,6 @@
 
 This is my Compiler construction course project, a simple LL(1) Grammar Analyzer written in C++.
 
-# Screenshot
-
-![Screenshot](screenshot/screenshot.png)
-
 # How to use
 
 ```bash
@@ -17,3 +13,7 @@ cmake ../
 make
 ./ll1_analyzer
 ```
+
+# Screenshot
+
+![Screenshot](screenshot/screenshot.png)
