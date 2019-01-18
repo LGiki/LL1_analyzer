@@ -1,4 +1,8 @@
-#include <bits/stdc++.h>
+#include <iostream>
+#include <vector>
+#include <map>
+#include <set>
+#include <fstream>
 #include "include/bprinter/table_printer.h"
 
 using namespace std;
